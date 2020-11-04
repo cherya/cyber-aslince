@@ -42,7 +42,10 @@ func msgLogger(u *tb.Update) bool {
 }
 
 func chatFilter(u *tb.Update) bool {
-	if u.Message == nil || u.Message.Chat == nil {
+	if u.Message == nil {
+		return true
+	}
+	if u.Message.Chat == nil || u.Message.Private() {
 		return true
 	}
 	if u.Message.Chat.Title != "твитор ОПГ" && u.Message.Chat.Title != "predlozhka_test_chat" {
@@ -122,7 +125,7 @@ func (a *Aslince) handle(m *tb.Message) {
 		}
 	}
 
-	if m.Photo != nil && chance(a.paintChance) {
+	if m.Photo != nil && chance(a.paintChance) || m.Private() && m.Photo != nil {
 		photo, err := a.paint(m)
 		if err != nil {
 			log.Error("can't paint", err)
