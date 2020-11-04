@@ -16,9 +16,9 @@ docker run --mount type=bind,source=$(pwd)/production.env,target=/app/production
 sleep 5
 
 if [ ! "$(docker ps -q -f name=$CONTAINER_NAME)" ]; then
-  msg="Update failed for *${repository}* \nref: *${ref}* \ncommit: (${commit_sha})[https://github.com/cherya/cyber-aslince/commit/${commit_sha}]"
+  msg="Update failed for *${repository}* \nref: *${ref}* \ncommit: [${commit_sha}](https://github.com/cherya/cyber-aslince/commit/${commit_sha})"
   bash scripts/notify.sh "$msg"
 else
-  msg="Successfully updated *${repository}* \nref: *${ref}* \ncommit: (${commit_sha})[https://github.com/cherya/cyber-aslince/commit/${commit_sha}]"
+  msg="Successfully updated *${repository}* \nref: *${ref}* \ncommit: [${commit_sha}](https://github.com/cherya/cyber-aslince/commit/${commit_sha})"
   bash scripts/notify.sh "$msg"
 fi
