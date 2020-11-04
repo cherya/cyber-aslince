@@ -22,7 +22,7 @@ func NewAslince(r *redis.Pool, b tb.Bot) *Aslince {
 	return &Aslince{
 		redis:       r,
 		Bot:         b,
-		paintChance: 10,
+		paintChance: 5,
 	}
 }
 
@@ -42,7 +42,7 @@ func msgLogger(u *tb.Update) bool {
 }
 
 func chatFilter(u *tb.Update) bool {
-	if u.Message.Chat == nil {
+	if u.Message == nil || u.Message.Chat == nil {
 		return true
 	}
 	if u.Message.Chat.Title != "твитор ОПГ" && u.Message.Chat.Title != "predlozhka_test_chat" {

@@ -10,29 +10,9 @@ env:
   IMAGE_NAME: cyber-aslince
 
 jobs:
-  # Run tests.
-  # See also https://docs.docker.com/docker-hub/builds/automated-testing/
-  test:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Run tests
-        run: |
-          if [ -f docker-compose.test.yml ]; then
-            docker-compose --file docker-compose.test.yml build
-            docker-compose --file docker-compose.test.yml run sut
-          else
-            docker build . --file Dockerfile
-          fi
-
   # Push image to GitHub Packages.
   # See also https://docs.docker.com/docker-hub/builds/
   push:
-    # Ensure test job passes before pushing image.
-    needs: test
-
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
 
@@ -68,7 +48,7 @@ jobs:
           docker push $IMAGE_ID:$VERSION
   deploy:
     runs-on: ubuntu-latest
-    # Ensure test job passes before pushing image.
+    # Ensure push job passes before pushing image.
     needs: push
     steps:
       - name: Invoke deployment hook
