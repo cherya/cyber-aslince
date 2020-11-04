@@ -79,7 +79,7 @@ func (a *Aslince) getStatus() (string, error) {
 
 func (a *Aslince) handle(m *tb.Message) {
 	if isComand(m.Text) {
-		if strings.Contains(m.Text, "че там") || strings.Contains(m.Text, "чо там") || strings.Contains(m.Text, "че сегодня") {
+		if strings.Contains(m.Text, "че там") || strings.Contains(m.Text, "чо там") || strings.Contains(m.Text, "чё там") || strings.Contains(m.Text, "че сегодня") {
 			status, err := a.getStatus()
 			if err != nil {
 				log.Error(err)
