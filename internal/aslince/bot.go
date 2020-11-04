@@ -12,7 +12,8 @@ import (
 
 type Aslince struct {
 	tb.Bot
-	redis *redis.Pool
+	redis       *redis.Pool
+	lastMessage tb.Message
 }
 
 func NewAslince(r *redis.Pool, b tb.Bot) *Aslince {
@@ -30,23 +31,32 @@ var sources = map[string][]string{
 	"рифмы и панчи": {"рифмы и панчи"},
 }
 
+func msgLogger(u *tb.Update) bool {
+	if u.Message != nil {
+		log.Debugf("got message '%s' from %d:%s", textFromMsg(u.Message), u.Message.Sender.ID, u.Message.Sender.FirstName)
+	}
+	return true
+}
+
+func chatFilter(u *tb.Update) bool {
+	if u.Message.Chat.Title != "твитор ОПГ" && u.Message.Chat.Title != "predlozhka_test_chat" {
+		log.Debugf("skip message '%s' from %d:%s", textFromMsg(u.Message), u.Message.Sender.ID, u.Message.Sender.FirstName)
+		return false
+	}
+	return true
+}
+
 func (a *Aslince) Start() {
 	a.Handle(tb.OnText, a.handle)
 	a.Handle(tb.OnPhoto, a.handle)
 	a.Handle(tb.OnVideo, a.handle)
-	logger := tb.NewMiddlewarePoller(a.Poller, func(u *tb.Update) bool {
-		log.Debug("got update ", u.Message.Chat.Title)
-		if u.Message.Chat.Title != "твитор ОПГ" && u.Message.Chat.Title != "predlozhka_test_chat" {
-			log.Debugf("skip message '%s' from %d:%s", textFromMsg(u.Message), u.Message.Sender.ID, u.Message.Sender.FirstName)
-			return false
-		}
-		if u.Message != nil {
-			log.Debugf("got message '%s' from %d:%s", textFromMsg(u.Message), u.Message.Sender.ID, u.Message.Sender.FirstName)
-		}
-		return true
-	})
-	a.Poller = logger
+
+	poller := tb.NewMiddlewarePoller(a.Poller, msgLogger)
+	poller = tb.NewMiddlewarePoller(poller, chatFilter)
+
+	a.Poller = poller
 	a.Bot.Start()
+	a.startBackgroundJobs()
 }
 
 func (a *Aslince) getStatus() (string, error) {
@@ -125,8 +135,20 @@ func checkText(text string, checks []string) bool {
 
 var namespace = "aslince"
 
+func TimeIn(t time.Time, name string) (time.Time, error) {
+	loc, err := time.LoadLocation(name)
+	if err == nil {
+		t = t.In(loc)
+	}
+	return t, err
+}
+
 func dailySrcKey(src string) string {
-	return fmt.Sprintf("%s:%s:%s", namespace, src, time.Now().Format("02-01-2006"))
+	t, err := TimeIn(time.Now(), "Europe/Moscow")
+	if err != nil {
+		t = time.Now()
+	}
+	return fmt.Sprintf("%s:%s:%s", namespace, src, t.Format("02-01-2006"))
 }
 
 func (a *Aslince) replySuccessCheck(m *tb.Message, source string) error {
