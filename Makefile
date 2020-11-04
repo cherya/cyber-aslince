@@ -15,6 +15,9 @@ GOBIN_PATH=$(GOPATH)/bin
 all: test build
 
 build:
+	export CGO_CFLAGS="$(pkg-config --cflags MagickWand)"
+	export CGO_LDFLAGS="$(pkg-config --libs MagickWand)"
+	export CGO_CFLAGS_ALLOW='-Xpreprocessor'
 	$(GOBUILD) -o $(BINARY_PATH)/$(BINARY_NAME) -v $(MAIN_NAME)
 
 test:

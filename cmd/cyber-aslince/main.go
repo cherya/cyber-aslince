@@ -11,6 +11,7 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/joho/godotenv"
 	log "github.com/sirupsen/logrus"
+	"gopkg.in/gographics/imagick.v2/imagick"
 	tb "gopkg.in/tucnak/telebot.v2"
 )
 
@@ -20,6 +21,9 @@ func main() {
 	logger.Init(log.DebugLevel, logDateFormat)
 
 	initEnv()
+
+	imagick.Initialize()
+	defer imagick.Terminate()
 
 	var redisPool = &redis.Pool{
 		MaxActive: 5,
@@ -35,7 +39,7 @@ func main() {
 	}
 
 	b, err := tb.NewBot(tb.Settings{
-		URL: "https://api.telegram.org",
+		URL:    "https://api.telegram.org",
 		Token:  config.GetValue(config.TgBotToken),
 		Poller: &tb.LongPoller{Timeout: 10 * time.Second},
 	})

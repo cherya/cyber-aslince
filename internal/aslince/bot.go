@@ -2,6 +2,7 @@ package aslince
 
 import (
 	"fmt"
+	"math/rand"
 	"strings"
 	"time"
 
@@ -14,12 +15,14 @@ type Aslince struct {
 	tb.Bot
 	redis       *redis.Pool
 	lastMessage tb.Message
+	paintChance int
 }
 
 func NewAslince(r *redis.Pool, b tb.Bot) *Aslince {
 	return &Aslince{
-		redis: r,
-		Bot:   b,
+		redis:       r,
+		Bot:         b,
+		paintChance: 10,
 	}
 }
 
@@ -39,6 +42,9 @@ func msgLogger(u *tb.Update) bool {
 }
 
 func chatFilter(u *tb.Update) bool {
+	if u.Message.Chat == nil {
+		return true
+	}
 	if u.Message.Chat.Title != "твитор ОПГ" && u.Message.Chat.Title != "predlozhka_test_chat" {
 		log.Debugf("skip message '%s' from %d:%s", textFromMsg(u.Message), u.Message.Sender.ID, u.Message.Sender.FirstName)
 		return false
@@ -77,6 +83,10 @@ func (a *Aslince) getStatus() (string, error) {
 	return b.String(), nil
 }
 
+func chance(c int) bool {
+	return rand.Intn(99)+1 <= c
+}
+
 func (a *Aslince) handle(m *tb.Message) {
 	if isComand(m.Text) {
 		if strings.Contains(m.Text, "че там") || strings.Contains(m.Text, "чо там") || strings.Contains(m.Text, "чё там") || strings.Contains(m.Text, "че сегодня") {
@@ -87,7 +97,40 @@ func (a *Aslince) handle(m *tb.Message) {
 			}
 			a.Send(m.Chat, status, &tb.SendOptions{ReplyTo: m})
 		}
-		return
+
+		if strings.Contains(m.Text, "рисуй меньше") {
+			if a.paintChance > 10 {
+				a.paintChance -= 10
+				a.Send(m.Chat, "да бля", &tb.SendOptions{ReplyTo: m})
+			} else {
+				a.Send(m.Chat, "затравили", &tb.SendOptions{ReplyTo: m})
+			}
+		}
+
+		if strings.Contains(m.Text, "рисуй больше") {
+			if a.paintChance <= 90 {
+				a.paintChance += 10
+				a.Send(m.Chat, "ладно", &tb.SendOptions{ReplyTo: m})
+			} else {
+				a.Send(m.Chat, "больше не могу(", &tb.SendOptions{ReplyTo: m})
+			}
+		}
+
+		if strings.Contains(m.Text, "не рисуй") {
+			a.paintChance = 0
+			a.Send(m.Chat, "травля((", &tb.SendOptions{ReplyTo: m})
+		}
+	}
+
+	if m.Photo != nil && chance(a.paintChance) {
+		photo, err := a.paint(m)
+		if err != nil {
+			log.Error("can't paint", err)
+		}
+		_, err = a.Send(m.Chat, photo)
+		if err != nil {
+			log.Error(err)
+		}
 	}
 
 	for name, checks := range sources {
