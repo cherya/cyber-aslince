@@ -37,6 +37,9 @@ var sources = map[string][]string{
 func msgLogger(u *tb.Update) bool {
 	if u.Message != nil {
 		log.Debugf("got message '%s' from %d:%s", textFromMsg(u.Message), u.Message.Sender.ID, u.Message.Sender.FirstName)
+		if u.Message.Voice != nil {
+			log.Debug(u.Message.Voice)
+		}
 	}
 	return true
 }
@@ -197,6 +200,19 @@ func dailySrcKey(src string) string {
 	return fmt.Sprintf("%s:%s:%s", namespace, src, t.Format("02-01-2006"))
 }
 
+func (a *Aslince) checkBingo() bool {
+	conn := a.redis.Get()
+	defer conn.Close()
+
+	for s := range sources {
+		val, err := redis.Int(conn.Do("GET", dailySrcKey(s)))
+		if err != nil || val < 1 {
+			return false
+		}
+	}
+	return true
+}
+
 func (a *Aslince) replySuccessCheck(m *tb.Message, source string) error {
 	conn := a.redis.Get()
 	defer conn.Close()
@@ -211,6 +227,21 @@ func (a *Aslince) replySuccessCheck(m *tb.Message, source string) error {
 	if err != nil {
 		log.Error("inc err ", err)
 		return err
+	}
+
+	bingo := a.checkBingo()
+	if bingo {
+		_, err := a.Send(
+			m.Chat,
+			&tb.Voice{File: tb.File{FileID: "AwACAgIAAxkBAAILRF-lgaG47OvQjYWQnrqVu7oT_Ft8AALgAwAC1JiQSDQf3N0GBXlMHgQ"}},
+			&tb.SendOptions{
+				ReplyTo: m,
+			},
+		)
+		if err != nil {
+			return err
+		}
+		return nil
 	}
 
 	if count > 1 {
