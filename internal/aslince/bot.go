@@ -3,6 +3,7 @@ package aslince
 import (
 	"fmt"
 	"math/rand"
+	"regexp"
 	"strings"
 	"time"
 
@@ -93,9 +94,12 @@ func chance(c int) bool {
 	return rand.Intn(99)+1 <= c
 }
 
+var chetamRegex = regexp.MustCompile("ч([еёо]|(то)) (там|сегодня)")
+
 func (a *Aslince) handle(m *tb.Message) {
-	if isComand(m.Text) {
-		if strings.Contains(m.Text, "че там") || strings.Contains(m.Text, "чо там") || strings.Contains(m.Text, "чё там") || strings.Contains(m.Text, "че сегодня") {
+	text := strings.ToLower(m.Text)
+	if isComand(text) {
+		if chetamRegex.MatchString(text) {
 			status, err := a.getStatus()
 			if err != nil {
 				log.Error(err)
@@ -104,7 +108,7 @@ func (a *Aslince) handle(m *tb.Message) {
 			a.Send(m.Chat, status, &tb.SendOptions{ReplyTo: m})
 		}
 
-		if strings.Contains(m.Text, "рисуй меньше") {
+		if strings.Contains(text, "рисуй меньше") {
 			if a.paintChance > 10 {
 				a.paintChance -= 10
 				a.Send(m.Chat, "да бля", &tb.SendOptions{ReplyTo: m})
@@ -113,7 +117,7 @@ func (a *Aslince) handle(m *tb.Message) {
 			}
 		}
 
-		if strings.Contains(m.Text, "рисуй больше") {
+		if strings.Contains(text, "рисуй больше") {
 			if a.paintChance <= 90 {
 				a.paintChance += 10
 				a.Send(m.Chat, "ладно", &tb.SendOptions{ReplyTo: m})
@@ -122,9 +126,13 @@ func (a *Aslince) handle(m *tb.Message) {
 			}
 		}
 
-		if strings.Contains(m.Text, "не рисуй") {
+		if strings.Contains(text, "не рисуй") {
 			a.paintChance = 0
 			a.Send(m.Chat, "травля((", &tb.SendOptions{ReplyTo: m})
+		}
+
+		if strings.Contains(text, "шансы") {
+			a.Send(m.Chat, fmt.Sprintf("%d/100", a.paintChance), &tb.SendOptions{ReplyTo: m})
 		}
 	}
 
@@ -268,7 +276,8 @@ func textFromMsg(m *tb.Message) string {
 	return text
 }
 
+var aslinceRegexp = regexp.MustCompile("(([ао]сли)+(ца|нце)|(@Aslincevtelege))")
+
 func isComand(text string) bool {
-	t := strings.ToLower(text)
-	return strings.Contains(t, "аслица") || strings.Contains(t, "аслинце") || strings.Contains(t, "ослица") || strings.Contains(t, "@Aslincevtelege")
+	return aslinceRegexp.MatchString(strings.ToLower(text))
 }
