@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gomodule/redigo/redis"
+	"github.com/mb-14/gomarkov"
 	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/tucnak/telebot.v2"
 )
@@ -17,14 +18,33 @@ type Aslince struct {
 	redis       *redis.Pool
 	lastMessage tb.Message
 	paintChance int
+	chain       *gomarkov.Chain
 }
 
 func NewAslince(r *redis.Pool, b tb.Bot) *Aslince {
-	return &Aslince{
+	a := &Aslince{
 		redis:       r,
 		Bot:         b,
 		paintChance: 5,
 	}
+	log.Info("Loading model")
+	chain, err := loadModel()
+	if err != nil {
+		log.Info("Model not found")
+		log.Info("Building model")
+		chain, err = buildModel()
+		if err != nil {
+			log.Error("error building model", err)
+		}
+		log.Info("Saving model")
+		err = saveModel(chain)
+		if err != nil {
+			log.Error("error saving model", err)
+		}
+		log.Info("Model builded and saved")
+	}
+	a.chain = chain
+	return a
 }
 
 var sources = map[string][]string{
@@ -133,6 +153,10 @@ func (a *Aslince) handle(m *tb.Message) {
 
 		if strings.Contains(text, "шансы") {
 			a.Send(m.Chat, fmt.Sprintf("%d/100", a.paintChance), &tb.SendOptions{ReplyTo: m})
+		}
+		if a.chain != nil {
+			text := generateMessage(a.chain)
+			a.Send(m.Chat, text[1:len(text)-1], &tb.SendOptions{ReplyTo: m})
 		}
 	}
 
