@@ -114,50 +114,61 @@ func chance(c int) bool {
 	return rand.Intn(99)+1 <= c
 }
 
+func (a *Aslince) handleCommand(m *tb.Message) {
+	if chetamRegex.MatchString(text) {
+		status, err := a.getStatus()
+		if err != nil {
+			log.Error(err)
+			a.Send(m.Chat, "да нихуя", &tb.SendOptions{ReplyTo: m})
+		}
+		a.Send(m.Chat, status, &tb.SendOptions{ReplyTo: m})
+		return
+	}
+
+	if strings.Contains(text, "рисуй меньше") {
+		if a.paintChance > 10 {
+			a.paintChance -= 10
+			a.Send(m.Chat, "да бля", &tb.SendOptions{ReplyTo: m})
+		} else {
+			a.Send(m.Chat, "затравили", &tb.SendOptions{ReplyTo: m})
+		}
+		return
+	}
+
+	if strings.Contains(text, "рисуй больше") {
+		if a.paintChance <= 90 {
+			a.paintChance += 10
+			a.Send(m.Chat, "ладно", &tb.SendOptions{ReplyTo: m})
+		} else {
+			a.Send(m.Chat, "больше не могу(", &tb.SendOptions{ReplyTo: m})
+		}
+		return
+	}
+
+	if strings.Contains(text, "не рисуй") {
+		a.paintChance = 0
+		a.Send(m.Chat, "травля((", &tb.SendOptions{ReplyTo: m})
+		return
+	}
+
+	if strings.Contains(text, "шансы") {
+		a.Send(m.Chat, fmt.Sprintf("%d/100", a.paintChance), &tb.SendOptions{ReplyTo: m})
+		return
+	}
+
+	if a.chain != nil {
+		text := generateMessage(a.chain)
+		a.Send(m.Chat, text[1:len(text)-1], &tb.SendOptions{ReplyTo: m})
+		return
+	}
+}
+
 var chetamRegex = regexp.MustCompile("ч([еёо]|(то)) (там|сегодня)")
 
 func (a *Aslince) handle(m *tb.Message) {
 	text := strings.ToLower(m.Text)
 	if isComand(text) {
-		if chetamRegex.MatchString(text) {
-			status, err := a.getStatus()
-			if err != nil {
-				log.Error(err)
-				a.Send(m.Chat, "да нихуя", &tb.SendOptions{ReplyTo: m})
-			}
-			a.Send(m.Chat, status, &tb.SendOptions{ReplyTo: m})
-		}
-
-		if strings.Contains(text, "рисуй меньше") {
-			if a.paintChance > 10 {
-				a.paintChance -= 10
-				a.Send(m.Chat, "да бля", &tb.SendOptions{ReplyTo: m})
-			} else {
-				a.Send(m.Chat, "затравили", &tb.SendOptions{ReplyTo: m})
-			}
-		}
-
-		if strings.Contains(text, "рисуй больше") {
-			if a.paintChance <= 90 {
-				a.paintChance += 10
-				a.Send(m.Chat, "ладно", &tb.SendOptions{ReplyTo: m})
-			} else {
-				a.Send(m.Chat, "больше не могу(", &tb.SendOptions{ReplyTo: m})
-			}
-		}
-
-		if strings.Contains(text, "не рисуй") {
-			a.paintChance = 0
-			a.Send(m.Chat, "травля((", &tb.SendOptions{ReplyTo: m})
-		}
-
-		if strings.Contains(text, "шансы") {
-			a.Send(m.Chat, fmt.Sprintf("%d/100", a.paintChance), &tb.SendOptions{ReplyTo: m})
-		}
-		if a.chain != nil {
-			text := generateMessage(a.chain)
-			a.Send(m.Chat, text[1:len(text)-1], &tb.SendOptions{ReplyTo: m})
-		}
+		a.handleCommand(m)
 	}
 
 	if m.Photo != nil && chance(a.paintChance) || m.Private() && m.Photo != nil {
