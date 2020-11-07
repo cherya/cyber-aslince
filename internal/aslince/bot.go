@@ -114,7 +114,7 @@ func chance(c int) bool {
 	return rand.Intn(99)+1 <= c
 }
 
-func (a *Aslince) handleCommand(m *tb.Message) {
+func (a *Aslince) handleCommand(text string) {
 	if chetamRegex.MatchString(text) {
 		status, err := a.getStatus()
 		if err != nil {
@@ -168,7 +168,7 @@ var chetamRegex = regexp.MustCompile("ч([еёо]|(то)) (там|сегодня
 func (a *Aslince) handle(m *tb.Message) {
 	text := strings.ToLower(m.Text)
 	if isComand(text) {
-		a.handleCommand(m)
+		a.handleCommand(text)
 	}
 
 	if m.Photo != nil && chance(a.paintChance) || m.Private() && m.Photo != nil {
