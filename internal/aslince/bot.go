@@ -114,7 +114,7 @@ func chance(c int) bool {
 	return rand.Intn(99)+1 <= c
 }
 
-func (a *Aslince) handleCommand(text string, m &tb.Message) {
+func (a *Aslince) handleCommand(text string, m *tb.Message) {
 	if chetamRegex.MatchString(text) {
 		status, err := a.getStatus()
 		if err != nil {
