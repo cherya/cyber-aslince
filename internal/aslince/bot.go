@@ -171,6 +171,14 @@ func (a *Aslince) handle(m *tb.Message) {
 		a.handleCommand(text, m)
 	}
 
+	if m.IsReply() && m.ReplyTo.Sender.ID == a.Me.ID {
+		if a.chain != nil {
+			text := generateMessage(a.chain)
+			a.Send(m.Chat, text[1:len(text)-1], &tb.SendOptions{ReplyTo: m})
+			return
+		}
+	}
+
 	if m.Photo != nil && chance(a.paintChance) || m.Private() && m.Photo != nil {
 		photo, err := a.paint(m)
 		if err != nil {
