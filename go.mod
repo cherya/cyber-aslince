@@ -2,7 +2,6 @@ module github.com/cherya/cyber-aslince
 
 require (
 	github.com/gomodule/redigo v2.0.0+incompatible
-	github.com/google/martian v2.1.0+incompatible
 	github.com/joho/godotenv v1.3.0
 	github.com/mb-14/gomarkov v0.0.0-20200824165802-565ae3f3c79f
 	github.com/pkg/errors v0.9.1

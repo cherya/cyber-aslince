@@ -171,7 +171,7 @@ func (a *Aslince) handle(m *tb.Message) {
 		a.handleCommand(text, m)
 	}
 
-	if m.IsReply() && m.ReplyTo.Sender.ID == a.Me.ID {
+	if m.IsReply() && m.ReplyTo.Sender.ID == a.Me.ID || m.Private() {
 		if a.chain != nil {
 			text := generateMessage(a.chain, m.Text)
 			a.Send(m.Chat, text, &tb.SendOptions{ReplyTo: m})

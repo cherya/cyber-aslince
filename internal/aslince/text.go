@@ -45,6 +45,7 @@ func (m *msgText) UnmarshalJSON(data []byte) error {
 
 func getFirstToken(text string) string {
 	if len(messages) == 0 {
+		log.Debug("getFirstToken: empty messages")
 		return ""
 	}
 	s := strings.Split(text, " ")
@@ -61,19 +62,17 @@ func getFirstToken(text string) string {
 }
 
 func generateMessage(chain *gomarkov.Chain, text string) string {
-	t := getFirstToken(text)
-	tokens := []string{gomarkov.StartToken, cleanText(t)}
-	var at = 0
-	for tokens[len(tokens)-1] != gomarkov.EndToken || at >= 10 {
-		at++
+	t := cleanText(getFirstToken(text))
+	log.Debugf("token='%s'", t)
+	tokens := []string{gomarkov.StartToken, t}
+	for tokens[len(tokens)-1] != gomarkov.EndToken {
 		next, err := chain.Generate(tokens[(len(tokens) - 1):])
 		if err != nil {
-			log.Error("error generating text ", err)
+			log.Errorf("error generating text. token='%s'. %s", t, err)
 			return strings.Join(tokens, " ")
 		}
-		if next == gomarkov.EndToken && len(tokens) < 4 {
-			t = getFirstToken(text)
-			tokens = []string{gomarkov.StartToken, cleanText(t)}
+		if next == gomarkov.EndToken && len(tokens) < 3 {
+			tokens = []string{gomarkov.StartToken}
 			continue
 		}
 		tokens = append(tokens, next)
@@ -106,7 +105,7 @@ func buildModel() (*gomarkov.Chain, error) {
 			continue
 		}
 		text := cleanText(m.Text.Text)
-		if text != "" {
+		if text != "" && text != " " {
 			chain.Add(strings.Split(text, " "))
 		}
 		messages[m.ID] = m
@@ -124,18 +123,20 @@ func buildModel() (*gomarkov.Chain, error) {
 }
 
 var (
-	r1    = regexp.MustCompile(`[\"\'\(\)\[\]\\\/\?\!\-_=—,]`)
-	r2    = regexp.MustCompile(`(\,\:)`)
+	r1    = regexp.MustCompile(`[^a-zA-Zа-яА-ЯёЁ\+.0-9\s%]`)
+	r2    = regexp.MustCompile(`(\,\:\.)`)
 	space = regexp.MustCompile(`\s+`)
 )
 
 func cleanText(text string) string {
-	text = strings.ReplaceAll(text, `\n`, "")
-	text = r1.ReplaceAllString(text, "")
+	text = strings.ReplaceAll(text, `\n`, " ")
+	text = r1.ReplaceAllString(text, " ")
 	text = r2.ReplaceAllStringFunc(text, func(m string) string {
 		return fmt.Sprintf(" %s ", m)
 	})
+
 	text = space.ReplaceAllString(text, " ")
+	text = strings.TrimSpace(text)
 	return strings.ToLower(text)
 }
 
