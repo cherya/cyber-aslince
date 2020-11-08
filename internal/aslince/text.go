@@ -69,7 +69,7 @@ func generateMessage(chain *gomarkov.Chain, text string) string {
 		next, err := chain.Generate(tokens[(len(tokens) - 1):])
 		if err != nil {
 			log.Errorf("error generating text. token='%s'. %s", t, err)
-			return strings.Join(tokens, " ")
+			tokens = []string{gomarkov.StartToken}
 		}
 		if next == gomarkov.EndToken && len(tokens) < 3 {
 			tokens = []string{gomarkov.StartToken}
