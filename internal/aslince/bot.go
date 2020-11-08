@@ -157,7 +157,7 @@ func (a *Aslince) handleCommand(text string, m *tb.Message) {
 	}
 
 	if a.chain != nil {
-		text := generateMessage(a.chain)
+		text := generateMessage(a.chain, m.Text)
 		a.Send(m.Chat, text[1:len(text)-1], &tb.SendOptions{ReplyTo: m})
 		return
 	}
@@ -173,8 +173,8 @@ func (a *Aslince) handle(m *tb.Message) {
 
 	if m.IsReply() && m.ReplyTo.Sender.ID == a.Me.ID {
 		if a.chain != nil {
-			text := generateMessage(a.chain)
-			a.Send(m.Chat, text[1:len(text)-1], &tb.SendOptions{ReplyTo: m})
+			text := generateMessage(a.chain, m.Text)
+			a.Send(m.Chat, text, &tb.SendOptions{ReplyTo: m})
 			return
 		}
 	}
