@@ -70,6 +70,7 @@ func generateMessage(chain *gomarkov.Chain, text string) string {
 		if err != nil {
 			log.Errorf("error generating text. token='%s'. %s", t, err)
 			tokens = []string{gomarkov.StartToken}
+			continue
 		}
 		if next == gomarkov.EndToken && len(tokens) < 3 {
 			tokens = []string{gomarkov.StartToken}
