@@ -63,11 +63,18 @@ func getFirstToken(text string) string {
 func generateMessage(chain *gomarkov.Chain, text string) string {
 	t := getFirstToken(text)
 	tokens := []string{gomarkov.StartToken, cleanText(t)}
-	for tokens[len(tokens)-1] != gomarkov.EndToken {
+	var at = 0
+	for tokens[len(tokens)-1] != gomarkov.EndToken || at >= 10 {
+		at++
 		next, err := chain.Generate(tokens[(len(tokens) - 1):])
 		if err != nil {
 			log.Error("error generating text ", err)
 			return strings.Join(tokens, " ")
+		}
+		if next == gomarkov.EndToken && len(tokens) < 4 {
+			t = getFirstToken(text)
+			tokens = []string{gomarkov.StartToken, cleanText(t)}
+			continue
 		}
 		tokens = append(tokens, next)
 	}
