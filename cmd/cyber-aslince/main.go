@@ -2,6 +2,9 @@ package main
 
 import (
 	"flag"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/cherya/cyber-aslince/internal/aslince"
@@ -48,9 +51,29 @@ func main() {
 		log.Fatal(err)
 		return
 	}
-
 	oslica := aslince.NewAslince(redisPool, *b)
+	stop := make(chan struct{})
+	go func() {
+		sigint := make(chan os.Signal, 1)
+
+		signal.Notify(sigint, os.Interrupt)
+		signal.Notify(sigint, syscall.SIGTERM)
+		signal.Notify(sigint, syscall.SIGKILL)
+
+		sig := <-sigint
+		log.Infof("caught signal %+v", sig)
+
+		// We received an interrupt signal, shut down.
+		if err := oslica.Shutdown(); err != nil {
+			// Error from closing listeners, or context timeout:
+			log.Printf("Aslince shutdown: %v", err)
+		}
+		close(stop)
+		log.Info("gracefully stopped")
+	}()
+
 	oslica.Start()
+	<- stop
 }
 
 func initEnv() {

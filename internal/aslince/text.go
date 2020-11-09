@@ -43,32 +43,70 @@ func (m *msgText) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func getFirstToken(text string) string {
-	if len(messages) == 0 {
-		log.Debug("getFirstToken: empty messages")
-		return ""
-	}
-	s := strings.Split(text, " ")
-	w := s[rand.Intn(len(s))]
-	for _, m := range messages {
-		if strings.Contains(m.Text.Text, w) {
-			if r, ok := replies[m.ID]; ok {
-				rid := r[rand.Intn(len(r))]
-				return strings.Split(messages[rid].Text.Text, " ")[0]
-			}
-		}
-	}
-	return w
+type Talker struct {
+	messages map[int]msg
+	replies  map[int][]int
+	chain    *gomarkov.Chain
 }
 
-func generateMessage(chain *gomarkov.Chain, text string) string {
-	t := cleanText(getFirstToken(text))
-	log.Debugf("token='%s'", t)
-	tokens := []string{gomarkov.StartToken, t}
-	for tokens[len(tokens)-1] != gomarkov.EndToken {
-		next, err := chain.Generate(tokens[(len(tokens) - 1):])
+func NewTalker(chatExportData []byte, model []byte) (*Talker, error) {
+	t := &Talker{
+		messages: make(map[int]msg),
+		replies:  make(map[int][]int),
+	}
+	var err error
+	var emptyModel = false
+	if len(model) != 0 {
+		log.Info("loading model")
+		t.chain, err = loadModel(model)
 		if err != nil {
-			log.Errorf("error generating text. token='%s'. %s", t, err)
+			log.Error("error loading model", err)
+			t.chain = gomarkov.NewChain(1)
+			emptyModel = true
+		} else {
+			log.Info("model successfully loaded")
+		}
+	} else {
+		log.Info("model is empty, creating")
+		t.chain = gomarkov.NewChain(1)
+		emptyModel = true
+	}
+
+	var l msgList
+	err = json.Unmarshal(chatExportData, &l)
+	if err != nil {
+		return nil, err
+	}
+	var amount = 0
+	for _, m := range l.Messages {
+		t.messages[m.ID] = m
+		if m.ReplyToMessageID != 0 {
+			_, ok := t.replies[m.ReplyToMessageID]
+			if !ok {
+				t.replies[m.ReplyToMessageID] = make([]int, 0)
+			}
+			t.replies[m.ReplyToMessageID] = append(t.replies[m.ReplyToMessageID], m.ID)
+		}
+		if m.ForwardedFrom != "" || m.ViaBot != "" || m.Type != "message" {
+			continue
+		}
+		text := cleanText(m.Text.Text)
+		if emptyModel && text != "" && text != " " {
+			amount++
+			t.chain.Add(strings.Split(text, " "))
+		}
+	}
+	log.Infof("Added %d messages to chain", amount)
+	return t, nil
+}
+
+func (t *Talker) GenerateMessage(text string) string {
+	tok := cleanText(t.getFirstToken(text))
+	tokens := []string{gomarkov.StartToken, tok}
+	for tokens[len(tokens)-1] != gomarkov.EndToken {
+		next, err := t.chain.Generate(tokens[(len(tokens) - 1):])
+		if err != nil {
+			log.Errorf("error generating text. token='%s'. %s", tok, err)
 			tokens = []string{gomarkov.StartToken}
 			continue
 		}
@@ -84,48 +122,37 @@ func generateMessage(chain *gomarkov.Chain, text string) string {
 	return result
 }
 
-var (
-	messages map[int]msg   = make(map[int]msg)
-	replies  map[int][]int = make(map[int][]int)
-)
+func (t *Talker) GetModel() *gomarkov.Chain {
+	return t.chain
+}
 
-func buildModel() (*gomarkov.Chain, error) {
-	chain := gomarkov.NewChain(1)
-	data, err := ioutil.ReadFile("./opg/result.json")
-	if err != nil {
-		return nil, err
+func (t *Talker) Add(text string) {
+	if text != "" && text != " " {
+		t.chain.Add(strings.Split(cleanText(text), " "))
 	}
-	var l msgList
-	err = json.Unmarshal(data, &l)
-	if err != nil {
-		return nil, err
+}
+
+func (t *Talker) getFirstToken(text string) string {
+	s := strings.Split(text, " ")
+	w := s[rand.Intn(len(s))]
+	if len(t.messages) == 0 {
+		log.Debug("getFirstToken: empty messages")
+		return w
 	}
-	var amount = 0
-	for _, m := range l.Messages {
-		if m.ForwardedFrom != "" || m.ViaBot != "" || m.Type != "message" {
-			continue
-		}
-		text := cleanText(m.Text.Text)
-		if text != "" && text != " " {
-			chain.Add(strings.Split(text, " "))
-		}
-		messages[m.ID] = m
-		if m.ReplyToMessageID != 0 {
-			_, ok := replies[m.ReplyToMessageID]
-			if !ok {
-				replies[m.ReplyToMessageID] = make([]int, 0)
+	for _, m := range t.messages {
+		if strings.Contains(m.Text.Text, w) {
+			if r, ok := t.replies[m.ID]; ok {
+				rid := r[rand.Intn(len(r))]
+				return strings.Split(t.messages[rid].Text.Text, " ")[0]
 			}
-			replies[m.ReplyToMessageID] = append(replies[m.ReplyToMessageID], m.ID)
 		}
-		amount++
 	}
-	log.Infof("Added %d messages to chain", amount)
-	return chain, nil
+	return w
 }
 
 var (
-	r1    = regexp.MustCompile(`[^a-zA-Zа-яА-ЯёЁ\+.0-9\s%]`)
-	r2    = regexp.MustCompile(`(\,\:\.)`)
+	r1    = regexp.MustCompile(`[^a-zA-Zа-яА-ЯёЁ+.0-9\s%]`)
+	r2    = regexp.MustCompile(`(,:\.)`)
 	space = regexp.MustCompile(`\s+`)
 )
 
@@ -149,15 +176,11 @@ func saveModel(c *gomarkov.Chain) error {
 	return ioutil.WriteFile("model.json", jsonObj, 0644)
 }
 
-func loadModel() (*gomarkov.Chain, error) {
+func loadModel(data []byte) (*gomarkov.Chain, error) {
 	var chain gomarkov.Chain
-	data, err := ioutil.ReadFile("model.json")
+	err := json.Unmarshal(data, &chain)
 	if err != nil {
-		return &chain, err
-	}
-	err = json.Unmarshal(data, &chain)
-	if err != nil {
-		return &chain, err
+		return nil, err
 	}
 	return &chain, nil
 }

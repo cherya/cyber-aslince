@@ -2,13 +2,14 @@ package aslince
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
+	"io/ioutil"
 	"math/rand"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
-	"github.com/mb-14/gomarkov"
 	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/tucnak/telebot.v2"
 )
@@ -18,7 +19,7 @@ type Aslince struct {
 	redis       *redis.Pool
 	lastMessage tb.Message
 	paintChance int
-	chain       *gomarkov.Chain
+	talk        *Talker
 }
 
 func NewAslince(r *redis.Pool, b tb.Bot) *Aslince {
@@ -27,23 +28,22 @@ func NewAslince(r *redis.Pool, b tb.Bot) *Aslince {
 		Bot:         b,
 		paintChance: 5,
 	}
-	log.Info("Loading model")
-	chain, err := loadModel()
+	chatExport, err := ioutil.ReadFile("opg/result.json")
 	if err != nil {
-		log.Info("Model not found")
-		log.Info("Building model")
-		chain, err = buildModel()
-		if err != nil {
-			log.Error("error building model", err)
-		}
-		log.Info("Saving model")
-		err = saveModel(chain)
-		if err != nil {
-			log.Error("error saving model", err)
-		}
-		log.Info("Model builded and saved")
+		log.Warn("chat export not found")
+		return a
 	}
-	a.chain = chain
+	model, err := ioutil.ReadFile("model.json")
+	if err != nil {
+		log.Warn("model.json not found")
+		model = []byte{}
+	}
+	t, err := NewTalker(chatExport, model)
+	if err != nil {
+		return a
+	}
+	a.talk = t
+
 	return a
 }
 
@@ -92,6 +92,22 @@ func (a *Aslince) Start() {
 	a.startBackgroundJobs()
 }
 
+func (a *Aslince) Shutdown() error {
+	a.Bot.Stop()
+	model := a.talk.GetModel()
+	if model != nil {
+		log.Debug("saving model...")
+		err := saveModel(model)
+		if err != nil {
+			return err
+		}
+		log.Debug("model saved")
+		return nil
+	}
+	log.Debug("model is empty, nothing to save")
+	return nil
+}
+
 func (a *Aslince) getStatus() (string, error) {
 	conn := a.redis.Get()
 	defer conn.Close()
@@ -115,6 +131,30 @@ func chance(c int) bool {
 }
 
 func (a *Aslince) handleCommand(text string, m *tb.Message) {
+	if m.ReplyTo != nil && m.ReplyTo.Photo != nil {
+		photo, err := a.paint(m.ReplyTo)
+		if err != nil {
+			log.Error("can't paint", err)
+		}
+		_, err = a.Send(m.Chat, photo)
+		if err != nil {
+			log.Error(err)
+		}
+		return
+	}
+
+	if m.Photo != nil {
+		photo, err := a.paint(m)
+		if err != nil {
+			log.Error("can't paint", err)
+		}
+		_, err = a.Send(m.Chat, photo)
+		if err != nil {
+			log.Error(err)
+		}
+		return
+	}
+
 	if chetamRegex.MatchString(text) {
 		status, err := a.getStatus()
 		if err != nil {
@@ -156,11 +196,21 @@ func (a *Aslince) handleCommand(text string, m *tb.Message) {
 		return
 	}
 
-	if a.chain != nil {
-		text := generateMessage(a.chain, m.Text)
-		a.Send(m.Chat, text, &tb.SendOptions{ReplyTo: m})
-		return
+	err := a.answer(m)
+	if err != nil {
+		log.Error("handleCommand: ", err)
 	}
+}
+
+func (a *Aslince) answer(m *tb.Message) error {
+	if a.talk != nil {
+		text := a.talk.GenerateMessage(m.Text)
+		_, err := a.Send(m.Chat, text, &tb.SendOptions{ReplyTo: m})
+		if err != nil {
+			return errors.Wrapf(err, "can't answer to message %s", m.ID)
+		}
+	}
+	return nil
 }
 
 var chetamRegex = regexp.MustCompile("ч([еёо]|(то)) (там|сегодня)")
@@ -169,14 +219,13 @@ func (a *Aslince) handle(m *tb.Message) {
 	text := strings.ToLower(m.Text)
 	if isComand(text) {
 		a.handleCommand(text, m)
-	}
-
-	if m.IsReply() && m.ReplyTo.Sender.ID == a.Me.ID || m.Private() {
-		if a.chain != nil {
-			text := generateMessage(a.chain, m.Text)
-			a.Send(m.Chat, text, &tb.SendOptions{ReplyTo: m})
-			return
+	} else if m.IsReply() && m.ReplyTo.Sender.ID == a.Me.ID || m.Private() {
+		err := a.answer(m)
+		if err != nil {
+			log.Error("handle: ", err)
 		}
+	} else {
+		a.talk.Add(m.Text)
 	}
 
 	if m.Photo != nil && chance(a.paintChance) || m.Private() && m.Photo != nil {

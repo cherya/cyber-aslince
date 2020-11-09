@@ -11,7 +11,11 @@ bash scripts/notify.sh "$msg"
 
 docker pull $IMAGE_NAME
 docker stop $CONTAINER_NAME && docker rm $CONTAINER_NAME
-docker run --mount type=bind,source=$(pwd)/production.env,target=/app/production.env --mount type=bind,source="$(pwd)"/opg,target=/app/opg/ --name $CONTAINER_NAME -d --net=host -d $IMAGE_NAME
+docker run \
+  --mount type=bind,source=$(pwd)/production.env,target=/app/production.env \
+  --mount type=bind,source=$(pwd)/model.json,target=/app/model.json \
+  --mount type=bind,source="$(pwd)"/opg,target=/app/opg/ \
+  --name $CONTAINER_NAME -d --net=host -d $IMAGE_NAME
 
 sleep 5
 
