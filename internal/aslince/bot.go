@@ -2,12 +2,13 @@ package aslince
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"io/ioutil"
 	"math/rand"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/gomodule/redigo/redis"
 	log "github.com/sirupsen/logrus"
@@ -17,7 +18,7 @@ import (
 type Aslince struct {
 	tb.Bot
 	redis       *redis.Pool
-	lastMessage tb.Message
+	lastMessage *tb.Message
 	paintChance int
 	talk        *Talker
 }
@@ -88,8 +89,8 @@ func (a *Aslince) Start() {
 	poller = tb.NewMiddlewarePoller(poller, chatFilter)
 
 	a.Poller = poller
-	a.Bot.Start()
 	a.startBackgroundJobs()
+	a.Bot.Start()
 }
 
 func (a *Aslince) Shutdown() error {
@@ -216,6 +217,7 @@ func (a *Aslince) answer(m *tb.Message) error {
 var chetamRegex = regexp.MustCompile("ч([еёо]|(то)) (там|сегодня)")
 
 func (a *Aslince) handle(m *tb.Message) {
+	a.lastMessage = m
 	text := strings.ToLower(m.Text)
 	if isComand(text) {
 		a.handleCommand(text, m)
