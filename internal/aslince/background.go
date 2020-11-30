@@ -32,7 +32,6 @@ func (a *Aslince) startBackgroundJobs() {
 }
 
 func (a *Aslince) deadChatCheck() bool {
-	log.Debug("checking dead chat...", a.lastMessage)
 	if a.lastMessage == nil {
 		return false
 	}
@@ -44,7 +43,7 @@ func (a *Aslince) deadChatCheck() bool {
 	if err != nil {
 		t = time.Now()
 	}
-	if t.Sub(mt).Hours() > 1 && a.lastMessage.Text != deadChatMessage {
+	if t.Sub(mt).Hours() > 3 && a.lastMessage.Text != deadChatMessage {
 		return true
 	}
 	return false
