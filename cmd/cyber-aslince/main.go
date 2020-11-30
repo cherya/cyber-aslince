@@ -63,17 +63,15 @@ func main() {
 		sig := <-sigint
 		log.Infof("caught signal %+v", sig)
 
-		// We received an interrupt signal, shut down.
 		if err := oslica.Shutdown(); err != nil {
-			// Error from closing listeners, or context timeout:
-			log.Printf("Aslince shutdown: %v", err)
+			log.Errorf("Aslince shutdown: %v", err)
 		}
 		close(stop)
 		log.Info("gracefully stopped")
 	}()
 
 	oslica.Start()
-	<- stop
+	<-stop
 }
 
 func initEnv() {

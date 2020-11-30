@@ -58,7 +58,7 @@ var sources = map[string][]string{
 
 func msgLogger(u *tb.Update) bool {
 	if u.Message != nil {
-		log.Debugf("got message '%s' from %d:%s", textFromMsg(u.Message), u.Message.Sender.ID, u.Message.Sender.FirstName)
+		log.Debugf("got message '%s' from %d:%s in chat %d", textFromMsg(u.Message), u.Message.Sender.ID, u.Message.Sender.FirstName, u.Message.Chat.ID)
 		if u.Message.Voice != nil {
 			log.Debug(u.Message.Voice)
 		}
