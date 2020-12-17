@@ -67,16 +67,16 @@ func msgLogger(u *tb.Update) bool {
 }
 
 func chatFilter(u *tb.Update) bool {
-	if u.Message == nil {
-		return true
-	}
-	if u.Message.Chat == nil || u.Message.Private() {
-		return true
-	}
-	if u.Message.Chat.Title != "твитор ОПГ" && u.Message.Chat.Title != "predlozhka_test_chat" {
-		log.Debugf("skip message '%s' from %d:%s", textFromMsg(u.Message), u.Message.Sender.ID, u.Message.Sender.FirstName)
-		return false
-	}
+// 	if u.Message == nil {
+// 		return true
+// 	}
+// 	if u.Message.Chat == nil || u.Message.Private() {
+// 		return true
+// 	}
+// 	if u.Message.Chat.Title != "твитор ОПГ" && u.Message.Chat.Title != "predlozhka_test_chat" && u.Message.Chat.ID != -1001169505246 {
+// 		log.Debugf("skip message '%s' from %d:%s", textFromMsg(u.Message), u.Message.Sender.ID, u.Message.Sender.FirstName)
+// 		return false
+// 	}
 	return true
 }
 
