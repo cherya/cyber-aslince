@@ -257,7 +257,12 @@ func (a *Aslince) handle(m *tb.Message) {
 			}
 		}
 	}
-
+	if m.Sender.ID == 418166693 {
+		err := a.replySuccessCheck(m, "тасс")
+		if err != nil {
+			log.Error("error reply success check Vitalya:", err)
+		}
+	}
 }
 
 func checkLinks(m *tb.Message, checks []string) bool {
@@ -320,7 +325,7 @@ func (a *Aslince) replySuccessCheck(m *tb.Message, source string) error {
 	defer conn.Close()
 
 	key := dailySrcKey(source)
-	_, err := conn.Do("SET", key, 0, "NX", "EX", time.Duration(time.Hour*24).Seconds())
+	_, err := conn.Do("SET", key, 0, "NX", "EX", (time.Hour*24).Seconds())
 	if err != nil {
 		log.Error("set err ", err)
 		return err

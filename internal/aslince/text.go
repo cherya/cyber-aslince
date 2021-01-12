@@ -151,13 +151,15 @@ func (t *Talker) getFirstToken(text string) string {
 }
 
 var (
-	r1    = regexp.MustCompile(`[^a-zA-Zа-яА-ЯёЁ+.0-9\s%]`)
-	r2    = regexp.MustCompile(`(,:\.)`)
-	space = regexp.MustCompile(`\s+`)
+	r1       = regexp.MustCompile(`[^a-zA-Zа-яА-ЯёЁ+.0-9\s%]`)
+	r2       = regexp.MustCompile(`(,:\.)`)
+	space    = regexp.MustCompile(`\s+`)
+	username = regexp.MustCompile(`@[a-zA-Z0-9]+`)
 )
 
 func cleanText(text string) string {
 	text = strings.ReplaceAll(text, `\n`, " ")
+	text = username.ReplaceAllString(text, "")
 	text = r1.ReplaceAllString(text, " ")
 	text = r2.ReplaceAllStringFunc(text, func(m string) string {
 		return fmt.Sprintf(" %s ", m)
