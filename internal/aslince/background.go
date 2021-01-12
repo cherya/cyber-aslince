@@ -24,7 +24,7 @@ func (a *Aslince) startBackgroundJobs() {
 			select {
 			case <-deadChatTicker.C:
 				if a.deadChatCheck() {
-					a.lastMessage, _ = a.Send(ChatRecipient{id: "29462028"}, deadChatMessage)
+					a.lastMessage, _ = a.Send(ChatRecipient{id: "-1001261346511"}, deadChatMessage)
 				}
 			}
 		}
