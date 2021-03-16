@@ -54,6 +54,7 @@ var sources = map[string][]string{
 	"двач":          {"2ch", "двач"},
 	"мдк":           {"mdk", "мдк"},
 	"рифмы и панчи": {"рифмы и панчи"},
+	"сбер":          {},
 }
 
 func msgLogger(u *tb.Update) bool {
