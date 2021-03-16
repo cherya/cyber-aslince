@@ -345,7 +345,7 @@ func (a *Aslince) replySuccessCheck(m *tb.Message, source string) error {
 
 	bingo := a.checkBingo()
 	if bingo {
-		set, err := redis.String(conn.Do("SET", dailySrcKey("bingo"), 0, "EX", (time.Hour * 24).Seconds()))
+		set, err := redis.String(conn.Do("SET", dailySrcKey("bingo"), 0, "NX", "EX", (time.Hour * 24).Seconds()))
 		if err != nil {
 			return err
 		}
