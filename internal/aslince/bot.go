@@ -345,7 +345,15 @@ func (a *Aslince) replySuccessCheck(m *tb.Message, source string) error {
 
 	bingo := a.checkBingo()
 	if bingo {
-		_, err := a.Send(
+		set, err := redis.String(conn.Do("SET", dailySrcKey("bingo"), 0, "EX", (time.Hour * 24).Seconds()))
+		if err != nil {
+			return err
+		}
+		if set != "OK" {
+			log.Info("bingo++")
+			return nil
+		}
+		_, err = a.Send(
 			m.Chat,
 			&tb.Voice{File: tb.File{FileID: "AwACAgIAAxkBAAILRF-lgaG47OvQjYWQnrqVu7oT_Ft8AALgAwAC1JiQSDQf3N0GBXlMHgQ"}},
 			&tb.SendOptions{
