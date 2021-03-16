@@ -68,16 +68,16 @@ func msgLogger(u *tb.Update) bool {
 }
 
 func chatFilter(u *tb.Update) bool {
-// 	if u.Message == nil {
-// 		return true
-// 	}
-// 	if u.Message.Chat == nil || u.Message.Private() {
-// 		return true
-// 	}
-// 	if u.Message.Chat.Title != "твитор ОПГ" && u.Message.Chat.Title != "predlozhka_test_chat" && u.Message.Chat.ID != -1001169505246 {
-// 		log.Debugf("skip message '%s' from %d:%s", textFromMsg(u.Message), u.Message.Sender.ID, u.Message.Sender.FirstName)
-// 		return false
-// 	}
+	// 	if u.Message == nil {
+	// 		return true
+	// 	}
+	// 	if u.Message.Chat == nil || u.Message.Private() {
+	// 		return true
+	// 	}
+	// 	if u.Message.Chat.Title != "твитор ОПГ" && u.Message.Chat.Title != "predlozhka_test_chat" && u.Message.Chat.ID != -1001169505246 {
+	// 		log.Debugf("skip message '%s' from %d:%s", textFromMsg(u.Message), u.Message.Sender.ID, u.Message.Sender.FirstName)
+	// 		return false
+	// 	}
 	return true
 }
 
@@ -264,6 +264,12 @@ func (a *Aslince) handle(m *tb.Message) {
 			log.Error("error reply success check Vitalya:", err)
 		}
 	}
+	if m.Sender.ID == 95123848 {
+		err := a.replySuccessCheck(m, "сбер")
+		if err != nil {
+			log.Error("error reply success check sber:", err)
+		}
+	}
 }
 
 func checkLinks(m *tb.Message, checks []string) bool {
@@ -326,7 +332,7 @@ func (a *Aslince) replySuccessCheck(m *tb.Message, source string) error {
 	defer conn.Close()
 
 	key := dailySrcKey(source)
-	_, err := conn.Do("SET", key, 0, "NX", "EX", (time.Hour*24).Seconds())
+	_, err := conn.Do("SET", key, 0, "NX", "EX", (time.Hour * 24).Seconds())
 	if err != nil {
 		log.Error("set err ", err)
 		return err
