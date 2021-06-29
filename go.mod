@@ -10,4 +10,4 @@ require (
 	gopkg.in/tucnak/telebot.v2 v2.3.5
 )
 
-go 1.15
+go 1.16

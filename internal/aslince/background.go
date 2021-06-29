@@ -3,6 +3,8 @@ package aslince
 import (
 	"time"
 
+	"github.com/cherya/cyber-aslince/internal/time_helpers"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -35,11 +37,11 @@ func (a *Aslince) deadChatCheck() bool {
 	if a.lastMessage == nil {
 		return false
 	}
-	mt, err := TimeIn(a.lastMessage.Time(), "Europe/Moscow")
+	mt, err := time_helpers.TimeIn(a.lastMessage.Time(), "Europe/Moscow")
 	if err != nil {
 		mt = a.lastMessage.Time()
 	}
-	t, err := TimeIn(time.Now(), "Europe/Moscow")
+	t, err := time_helpers.TimeIn(time.Now(), "Europe/Moscow")
 	if err != nil {
 		t = time.Now()
 	}

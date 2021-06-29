@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"os"
 	"regexp"
 	"strings"
-	"time"
 
-	"github.com/pkg/errors"
+	"github.com/cherya/cyber-aslince/internal/daily_plan"
 
 	"github.com/gomodule/redigo/redis"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	tb "gopkg.in/tucnak/telebot.v2"
 )
@@ -21,13 +22,20 @@ type Aslince struct {
 	lastMessage *tb.Message
 	paintChance int
 	talk        *Talker
+	plan        *daily_plan.DailyPlan
 }
+
+var redisNamespace = "aslince"
+var chetamRegex = regexp.MustCompile("ч([еёо]|(то)) (там|сегодня)")
+var eeeeeBoiRegex = regexp.MustCompile("[eе]* бо[йи]")
+var aslinceRegexp = regexp.MustCompile("(([ао]сли)+(нце)|(@Aslincevtelege))")
 
 func NewAslince(r *redis.Pool, b tb.Bot) *Aslince {
 	a := &Aslince{
 		redis:       r,
 		Bot:         b,
 		paintChance: 5,
+		plan:        daily_plan.New(r, redisNamespace),
 	}
 	chatExport, err := ioutil.ReadFile("opg/result.json")
 	if err != nil {
@@ -48,36 +56,13 @@ func NewAslince(r *redis.Pool, b tb.Bot) *Aslince {
 	return a
 }
 
-var sources = map[string][]string{
-	"зе флоу":       {"the-flow", "The Flow"},
-	"тасс":          {"tass", "tass.ru", "ТАСС"},
-	"двач":          {"2ch", "двач"},
-	"мдк":           {"mdk", "мдк"},
-	"рифмы и панчи": {"рифмы и панчи"},
-	"сбер":          {},
-}
-
 func msgLogger(u *tb.Update) bool {
-	if u.Message != nil {
-		log.Debugf("got message '%s' from %d:%s in chat %d", textFromMsg(u.Message), u.Message.Sender.ID, u.Message.Sender.FirstName, u.Message.Chat.ID)
-		if u.Message.Voice != nil {
-			log.Debug(u.Message.Voice)
-		}
-	}
-	return true
-}
-
-func chatFilter(u *tb.Update) bool {
-	// 	if u.Message == nil {
-	// 		return true
-	// 	}
-	// 	if u.Message.Chat == nil || u.Message.Private() {
-	// 		return true
-	// 	}
-	// 	if u.Message.Chat.Title != "твитор ОПГ" && u.Message.Chat.Title != "predlozhka_test_chat" && u.Message.Chat.ID != -1001169505246 {
-	// 		log.Debugf("skip message '%s' from %d:%s", textFromMsg(u.Message), u.Message.Sender.ID, u.Message.Sender.FirstName)
-	// 		return false
-	// 	}
+	//if u.Message != nil {
+	//	log.Debugf("got message '%s' from %d:%s in chat %d", u.Message.Sender.ID, u.Message.Sender.FirstName, u.Message.Chat.ID)
+	//	if u.Message.Voice != nil {
+	//		log.Debug(u.Message.Voice)
+	//	}
+	//}
 	return true
 }
 
@@ -87,7 +72,6 @@ func (a *Aslince) Start() {
 	a.Handle(tb.OnVideo, a.handle)
 
 	poller := tb.NewMiddlewarePoller(a.Poller, msgLogger)
-	poller = tb.NewMiddlewarePoller(poller, chatFilter)
 
 	a.Poller = poller
 	a.startBackgroundJobs()
@@ -110,29 +94,12 @@ func (a *Aslince) Shutdown() error {
 	return nil
 }
 
-func (a *Aslince) getStatus() (string, error) {
-	conn := a.redis.Get()
-	defer conn.Close()
-	b := strings.Builder{}
-	for s := range sources {
-		count, err := redis.Int(conn.Do("GET", dailySrcKey(s)))
-		if err != nil && err != redis.ErrNil {
-			return "", err
-		}
-		if count > 0 {
-			b.WriteString(fmt.Sprintf("☑️ %s\n", s))
-		} else {
-			b.WriteString(fmt.Sprintf("❌ %s\n", s))
-		}
-	}
-	return b.String(), nil
-}
-
 func chance(c int) bool {
 	return rand.Intn(99)+1 <= c
 }
 
 func (a *Aslince) handleCommand(text string, m *tb.Message) {
+	// paint
 	if m.ReplyTo != nil && m.ReplyTo.Photo != nil {
 		photo, err := a.paint(m.ReplyTo)
 		if err != nil {
@@ -144,7 +111,6 @@ func (a *Aslince) handleCommand(text string, m *tb.Message) {
 		}
 		return
 	}
-
 	if m.Photo != nil {
 		photo, err := a.paint(m)
 		if err != nil {
@@ -157,8 +123,9 @@ func (a *Aslince) handleCommand(text string, m *tb.Message) {
 		return
 	}
 
+	// plan
 	if chetamRegex.MatchString(text) {
-		status, err := a.getStatus()
+		status, err := a.plan.Status(m.Chat.ID)
 		if err != nil {
 			log.Error(err)
 			a.Send(m.Chat, "да нихуя", &tb.SendOptions{ReplyTo: m})
@@ -193,14 +160,9 @@ func (a *Aslince) handleCommand(text string, m *tb.Message) {
 		return
 	}
 
-	if strings.Contains(text, "шансы") {
+	if strings.Contains(text, "рисуешь?") {
 		a.Send(m.Chat, fmt.Sprintf("%d/100", a.paintChance), &tb.SendOptions{ReplyTo: m})
 		return
-	}
-
-	err := a.answer(m)
-	if err != nil {
-		log.Error("handleCommand: ", err)
 	}
 }
 
@@ -209,26 +171,23 @@ func (a *Aslince) answer(m *tb.Message) error {
 		text := a.talk.GenerateMessage(m.Text)
 		_, err := a.Send(m.Chat, text, &tb.SendOptions{ReplyTo: m})
 		if err != nil {
-			return errors.Wrapf(err, "can't answer to message %s", m.ID)
+			return errors.Wrapf(err, "can't answer to message %d", m.ID)
 		}
 	}
 	return nil
 }
 
-var chetamRegex = regexp.MustCompile("ч([еёо]|(то)) (там|сегодня)")
-
 func (a *Aslince) handle(m *tb.Message) {
 	a.lastMessage = m
 	text := strings.ToLower(m.Text)
-	if isComand(text) {
+	if isCommand(text) {
 		a.handleCommand(text, m)
+		return
 	} else if m.IsReply() && m.ReplyTo.Sender.ID == a.Me.ID || m.Private() {
 		err := a.answer(m)
 		if err != nil {
 			log.Error("handle: ", err)
 		}
-	} else {
-		a.talk.Add(m.Text)
 	}
 
 	if m.Photo != nil && chance(a.paintChance) || m.Private() && m.Photo != nil {
@@ -240,158 +199,88 @@ func (a *Aslince) handle(m *tb.Message) {
 		if err != nil {
 			log.Error(err)
 		}
+		return
 	}
 
-	for name, checks := range sources {
-		if checkLinks(m, checks) {
-			err := a.replySuccessCheck(m, name)
+	// цирк
+	if strings.Contains(strings.ToLower(text), "цирк") {
+		circus, err := os.Open("./resources/circus.jpg")
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		a.Send(m.Chat, &tb.Photo{File: tb.FromReader(circus)}, &tb.SendOptions{ReplyTo: m})
+	}
+
+	// eeeeeeeee boi
+	if eeeeeBoiRegex.MatchString(strings.ToLower(text)) {
+		err := a.eeeeeeBoi(m)
+		if err != nil {
+			log.Error("handle:", err)
+			return
+		}
+	}
+
+	err := a.planCheck(m)
+	if err != nil {
+		log.Error("handle: plan check error", err)
+	}
+
+	a.talk.Add(m.Text)
+}
+
+func (a *Aslince) eeeeeeBoi(m *tb.Message) error {
+	eeeee, err := os.Open("./resources/eeeeeeee.ogg")
+	if err != nil {
+		return errors.Wrap(err, "eeeeeeBoi: can't open audio")
+	}
+	mcAndroid, err := os.Open("./resources/mc_android.jpg")
+	if err != nil {
+		return errors.Wrap(err, "eeeeeeBoi: can't open thumbnail")
+	}
+	_, err = a.Send(m.Chat, &tb.Audio{
+		File:      tb.FromReader(eeeee),
+		Duration:  1,
+		Caption:   "",
+		Thumbnail: &tb.Photo{File: tb.FromReader(mcAndroid)},
+		Title:     "eeeeeeeeeeeeee boooooi",
+		Performer: "mc android",
+	}, &tb.SendOptions{ReplyTo: m})
+
+	return errors.Wrap(err, "eeeeeeBoi: can't send message")
+}
+
+func (a *Aslince) planCheck(m *tb.Message) error {
+	sources, err := a.plan.Check(m)
+	if err != nil {
+		return errors.Wrap(err, "planCheck: check error")
+	}
+
+	if bingo, err := a.plan.Bingo(m.Chat.ID); bingo {
+		if err != nil {
+			return errors.Wrap(err, "planCheck: error")
+		}
+		err := a.eeeeeeBoi(m)
+		if err != nil {
+			return errors.Wrap(err, "planCheck: bingo response error")
+		}
+	}
+
+	if len(sources) > 0 {
+		for _, s := range sources {
+			_, err = a.Send(
+				m.Chat,
+				fmt.Sprintf("☑️ %s – чек", s), &tb.SendOptions{
+					ReplyTo: m,
+				})
 			if err != nil {
-				log.Error("error reply success check link:", err)
-			}
-		}
-		if m.IsForwarded() && m.OriginalChat != nil {
-			if checkText(m.OriginalChat.Title, checks) {
-				err := a.replySuccessCheck(m, name)
-				if err != nil {
-					log.Error("error reply success check forward:", err)
-				}
+				log.Error("handle: check response error", err)
 			}
 		}
 	}
-	if m.Sender.ID == 418166693 {
-		err := a.replySuccessCheck(m, "тасс")
-		if err != nil {
-			log.Error("error reply success check Vitalya:", err)
-		}
-	}
-	if m.Sender.ID == 95123848 {
-		err := a.replySuccessCheck(m, "сбер")
-		if err != nil {
-			log.Error("error reply success check sber:", err)
-		}
-	}
-}
-
-func checkLinks(m *tb.Message, checks []string) bool {
-	for _, e := range m.Entities {
-		var text string
-		if e.Type == tb.EntityURL {
-			text = textFromMsg(m)[e.Offset : e.Offset+e.Length]
-		} else if e.Type != tb.EntityTextLink {
-			text = e.URL
-		}
-		if checkText(text, checks) {
-			return true
-		}
-	}
-	return false
-}
-
-func checkText(text string, checks []string) bool {
-	for _, c := range checks {
-		if strings.Contains(strings.ToLower(text), strings.ToLower(c)) {
-			return true
-		}
-	}
-	return false
-}
-
-var namespace = "aslince"
-
-func TimeIn(t time.Time, name string) (time.Time, error) {
-	loc, err := time.LoadLocation(name)
-	if err == nil {
-		t = t.In(loc)
-	}
-	return t, err
-}
-
-func dailySrcKey(src string) string {
-	t, err := TimeIn(time.Now(), "Europe/Moscow")
-	if err != nil {
-		t = time.Now()
-	}
-	return fmt.Sprintf("%s:%s:%s", namespace, src, t.Format("02-01-2006"))
-}
-
-func (a *Aslince) checkBingo() bool {
-	conn := a.redis.Get()
-	defer conn.Close()
-
-	for s := range sources {
-		val, err := redis.Int(conn.Do("GET", dailySrcKey(s)))
-		if err != nil || val < 1 {
-			return false
-		}
-	}
-	return true
-}
-
-func (a *Aslince) replySuccessCheck(m *tb.Message, source string) error {
-	conn := a.redis.Get()
-	defer conn.Close()
-
-	key := dailySrcKey(source)
-	_, err := conn.Do("SET", key, 0, "NX", "EX", (time.Hour * 24).Seconds())
-	if err != nil {
-		log.Error("set err ", err)
-		return err
-	}
-	count, err := redis.Int(conn.Do("INCR", key))
-	if err != nil {
-		log.Error("inc err ", err)
-		return err
-	}
-
-	bingo := a.checkBingo()
-	if bingo {
-		set, err := redis.String(conn.Do("SET", dailySrcKey("bingo"), 0, "NX", "EX", (time.Hour * 24).Seconds()))
-		if err != nil {
-			return err
-		}
-		if set != "OK" {
-			log.Info("bingo++")
-			return nil
-		}
-		_, err = a.Send(
-			m.Chat,
-			&tb.Voice{File: tb.File{FileID: "AwACAgIAAxkBAAILRF-lgaG47OvQjYWQnrqVu7oT_Ft8AALgAwAC1JiQSDQf3N0GBXlMHgQ"}},
-			&tb.SendOptions{
-				ReplyTo: m,
-			},
-		)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-
-	if count > 1 {
-		return nil
-	}
-
-	_, err = a.Send(
-		m.Chat,
-		fmt.Sprintf("☑️ %s – чек", source), &tb.SendOptions{
-			ReplyTo: m,
-		})
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
-func textFromMsg(m *tb.Message) string {
-	text := m.Text
-	if text == "" {
-		text = m.Caption
-	}
-	return text
-}
-
-var aslinceRegexp = regexp.MustCompile("(([ао]сли)+(ца|нце)|(@Aslincevtelege))")
-
-func isComand(text string) bool {
+func isCommand(text string) bool {
 	return aslinceRegexp.MatchString(strings.ToLower(text))
 }
