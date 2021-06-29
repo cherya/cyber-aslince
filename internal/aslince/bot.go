@@ -27,7 +27,7 @@ type Aslince struct {
 
 var redisNamespace = "aslince"
 var chetamRegex = regexp.MustCompile("ч([еёо]|(то)) (там|сегодня)")
-var eeeeeBoiRegex = regexp.MustCompile("[eе]* бо[йи]")
+var eeeeeBoiRegex = regexp.MustCompile("^[eе]* б(о)*[йи]$")
 var aslinceRegexp = regexp.MustCompile("(([ао]сли)+(нце)|(@Aslincevtelege))")
 
 func NewAslince(r *redis.Pool, b tb.Bot) *Aslince {
