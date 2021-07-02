@@ -204,12 +204,15 @@ func (a *Aslince) handle(m *tb.Message) {
 
 	// цирк
 	if strings.Contains(strings.ToLower(text), "цирк") {
-		circus, err := os.Open("./resources/circus.jpg")
+		circus, err := os.Open("./resources/circus.webp")
 		if err != nil {
 			log.Error(err)
 			return
 		}
-		a.Send(m.Chat, &tb.Photo{File: tb.FromReader(circus)}, &tb.SendOptions{ReplyTo: m})
+		a.Send(m.Chat, &tb.Sticker{
+			File:  tb.FromReader(circus),
+			Emoji: "🤡",
+		}, &tb.SendOptions{ReplyTo: m})
 	}
 
 	// eeeeeeeee boi
