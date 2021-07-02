@@ -164,6 +164,8 @@ func (a *Aslince) handleCommand(text string, m *tb.Message) {
 		a.Send(m.Chat, fmt.Sprintf("%d/100", a.paintChance), &tb.SendOptions{ReplyTo: m})
 		return
 	}
+
+	a.answer(m)
 }
 
 func (a *Aslince) answer(m *tb.Message) error {
