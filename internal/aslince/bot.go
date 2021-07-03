@@ -2,7 +2,8 @@ package aslince
 
 import (
 	"fmt"
-	"io/ioutil"
+	"github.com/cherya/cyber-aslince/internal/messages_helpers"
+	replyservice "github.com/cherya/cyber-aslince/internal/reply_service"
 	"math/rand"
 	"os"
 	"regexp"
@@ -21,37 +22,32 @@ type Aslince struct {
 	redis       *redis.Pool
 	lastMessage *tb.Message
 	paintChance int
-	talk        *Talker
 	plan        *daily_plan.DailyPlan
+	reply       *replyservice.Generator
 }
 
 var redisNamespace = "aslince"
 var chetamRegex = regexp.MustCompile("ч([еёо]|(то)) (там|сегодня)")
 var eeeeeBoiRegex = regexp.MustCompile("^[eе]* б(о)*[йи]$")
-var aslinceRegexp = regexp.MustCompile("(([ао]сли)+(нце)|(@Aslincevtelege))")
+var aslinceRegexp = regexp.MustCompile("((аслинце)|(@Aslincevtelege))")
 
-func NewAslince(r *redis.Pool, b tb.Bot) *Aslince {
+func NewAslince(r *redis.Pool, b tb.Bot, genURL string) *Aslince {
 	a := &Aslince{
 		redis:       r,
 		Bot:         b,
 		paintChance: 5,
 		plan:        daily_plan.New(r, redisNamespace),
+		reply:       replyservice.New(genURL),
 	}
-	chatExport, err := ioutil.ReadFile("opg/result.json")
-	if err != nil {
-		log.Warn("chat export not found")
-		return a
-	}
-	model, err := ioutil.ReadFile("model.json")
-	if err != nil {
-		log.Warn("model.json not found")
-		model = []byte{}
-	}
-	t, err := NewTalker(chatExport, model)
-	if err != nil {
-		return a
-	}
-	a.talk = t
+
+	go func() {
+		for {
+			repl := <-a.reply.RepliesChan()
+			a.Send(ChatRecipient{id: fmt.Sprintf("%d", repl.ChatID)}, repl.Text, &tb.SendOptions{
+				ReplyTo: &tb.Message{ID: repl.ID},
+			})
+		}
+	}()
 
 	return a
 }
@@ -80,17 +76,6 @@ func (a *Aslince) Start() {
 
 func (a *Aslince) Shutdown() error {
 	a.Bot.Stop()
-	model := a.talk.GetModel()
-	if model != nil {
-		log.Debug("saving model...")
-		err := saveModel(model)
-		if err != nil {
-			return err
-		}
-		log.Debug("model saved")
-		return nil
-	}
-	log.Debug("model is empty, nothing to save")
 	return nil
 }
 
@@ -165,18 +150,25 @@ func (a *Aslince) handleCommand(text string, m *tb.Message) {
 		return
 	}
 
-	a.answer(m)
+	if len(text) > 2 {
+		a.reply.Generate(textForGenerator(m), m.ID, m.Chat.ID)
+	}
 }
 
-func (a *Aslince) answer(m *tb.Message) error {
-	if a.talk != nil {
-		text := a.talk.GenerateMessage(m.Text)
-		_, err := a.Send(m.Chat, text, &tb.SendOptions{ReplyTo: m})
-		if err != nil {
-			return errors.Wrapf(err, "can't answer to message %d", m.ID)
-		}
+func textForGenerator(m *tb.Message) string {
+	var text string
+	texts := make([]string, 0, 2)
+	text = messages_helpers.TextFromMsg(m)
+	text = strings.ReplaceAll(text, "аслинце", "")
+	texts = append(texts, text)
+
+	if m.ReplyTo != nil {
+		text = messages_helpers.TextFromMsg(m)
+		text = strings.ReplaceAll(text, "аслинце", "")
+		texts = append(texts, text)
+		return strings.Join(texts, "\n")
 	}
-	return nil
+	return text
 }
 
 func (a *Aslince) handle(m *tb.Message) {
@@ -186,9 +178,11 @@ func (a *Aslince) handle(m *tb.Message) {
 		a.handleCommand(text, m)
 		return
 	} else if m.IsReply() && m.ReplyTo.Sender.ID == a.Me.ID || m.Private() {
-		err := a.answer(m)
-		if err != nil {
-			log.Error("handle: ", err)
+		a.reply.Generate(strings.ReplaceAll(text, "аслинце", ""), m.ID, m.Chat.ID)
+	} else {
+		text := textForGenerator(m)
+		if text != "" && chance(2) {
+			a.reply.Generate(textForGenerator(m), m.ID, m.Chat.ID)
 		}
 	}
 
@@ -230,8 +224,6 @@ func (a *Aslince) handle(m *tb.Message) {
 	if err != nil {
 		log.Error("handle: plan check error", err)
 	}
-
-	a.talk.Add(m.Text)
 }
 
 func (a *Aslince) eeeeeeBoi(m *tb.Message) error {

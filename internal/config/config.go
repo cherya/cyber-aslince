@@ -9,10 +9,11 @@ import (
 type configKey string
 
 const (
-	Debug         configKey = "DEBUG"
-	TgBotToken    configKey = "TG_BOT_TOKEN"
-	RedisAddress  configKey = "REDIS_ADDRESS"
-	RedisPassword configKey = "REDIS_PASSWORD"
+	Debug            configKey = "DEBUG"
+	TgBotToken       configKey = "TG_BOT_TOKEN"
+	RedisAddress     configKey = "REDIS_ADDRESS"
+	RedisPassword    configKey = "REDIS_PASSWORD"
+	TextGeneratorURL configKey = "TEXT_GENERATOR_URL"
 )
 
 func GetValue(key configKey) string {

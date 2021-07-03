@@ -51,7 +51,7 @@ func main() {
 		log.Fatal(err)
 		return
 	}
-	oslica := aslince.NewAslince(redisPool, *b)
+	oslica := aslince.NewAslince(redisPool, *b, config.GetValue(config.TextGeneratorURL))
 	stop := make(chan struct{})
 	go func() {
 		sigint := make(chan os.Signal, 1)
