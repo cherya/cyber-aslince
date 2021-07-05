@@ -2,12 +2,13 @@ package aslince
 
 import (
 	"fmt"
-	"github.com/cherya/cyber-aslince/internal/messages_helpers"
-	replyservice "github.com/cherya/cyber-aslince/internal/reply_service"
 	"math/rand"
 	"os"
 	"regexp"
 	"strings"
+
+	"github.com/cherya/cyber-aslince/internal/messages_helpers"
+	replyservice "github.com/cherya/cyber-aslince/internal/reply_service"
 
 	"github.com/cherya/cyber-aslince/internal/daily_plan"
 
@@ -157,17 +158,8 @@ func (a *Aslince) handleCommand(text string, m *tb.Message) {
 
 func textForGenerator(m *tb.Message) string {
 	var text string
-	texts := make([]string, 0, 2)
 	text = messages_helpers.TextFromMsg(m)
-	text = strings.ReplaceAll(text, "аслинце", "")
-	texts = append(texts, text)
-
-	if m.ReplyTo != nil {
-		text = messages_helpers.TextFromMsg(m)
-		text = strings.ReplaceAll(text, "аслинце", "")
-		texts = append(texts, text)
-		return strings.Join(texts, "\n")
-	}
+	text = strings.ReplaceAll(strings.ToLower(text), "аслинце", "")
 	return text
 }
 
