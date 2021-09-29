@@ -55,7 +55,7 @@ func New(url string) *Generator {
 			} else {
 				var req Request
 				req, g.requests = g.requests[0], g.requests[1:]
-
+				log.Infof("requested %d", req.ID)
 				resp, err := g.doRequest(req.Text)
 				if err != nil {
 					log.Error(err)
@@ -95,6 +95,7 @@ func (g *Generator) Generate(text string, replyTo int, chatID int64) {
 	if len(g.requests) == 5 {
 		g.requests = g.requests[1:]
 	}
+	log.Infof("queued %d, queue size %d", replyTo, len(g.requests))
 	g.requests = append(g.requests, Request{
 		Text:   text,
 		ID:     replyTo,

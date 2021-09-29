@@ -44,6 +44,7 @@ func NewAslince(r *redis.Pool, b tb.Bot, genURL string) *Aslince {
 	go func() {
 		for {
 			repl := <-a.reply.RepliesChan()
+			log.Infof("got reply for %d", repl.ID)
 			if repl.Response.Sticker != "" {
 				sticker, err := os.Open(fmt.Sprintf("./resources/stickers/sticker (%s).webp", repl.Response.Sticker))
 				if err != nil {
