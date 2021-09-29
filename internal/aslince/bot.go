@@ -50,20 +50,20 @@ func NewAslince(r *redis.Pool, b tb.Bot, genURL string) *Aslince {
 				if err != nil {
 					if errors.Cause(err) != os.ErrNotExist {
 						log.Error(err)
-						return
+						continue
 					}
 					stickerN := rand.Intn(6667)
 					sticker, err = os.Open(fmt.Sprintf("./resources/stickers/sticker (%d).webp", stickerN))
 					if err != nil {
 						log.Error(err)
-						return
+						continue
 					}
 				}
 				a.Send(ChatRecipient{id: fmt.Sprintf("%d", repl.ChatID)}, &tb.Sticker{
 					File:  tb.FromReader(sticker),
 					Emoji: "🤡",
 				}, &tb.SendOptions{ReplyTo: &tb.Message{ID: repl.ID}})
-				return
+				continue
 			}
 			a.Send(ChatRecipient{id: fmt.Sprintf("%d", repl.ChatID)}, repl.Response.Text, &tb.SendOptions{
 				ReplyTo: &tb.Message{ID: repl.ID},
