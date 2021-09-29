@@ -62,6 +62,7 @@ func NewAslince(r *redis.Pool, b tb.Bot, genURL string) *Aslince {
 					File:  tb.FromReader(sticker),
 					Emoji: "🤡",
 				}, &tb.SendOptions{ReplyTo: &tb.Message{ID: repl.ID}})
+				return
 			}
 			a.Send(ChatRecipient{id: fmt.Sprintf("%d", repl.ChatID)}, repl.Response.Text, &tb.SendOptions{
 				ReplyTo: &tb.Message{ID: repl.ID},
