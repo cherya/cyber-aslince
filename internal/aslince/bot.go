@@ -181,7 +181,6 @@ func textForGenerator(m *tb.Message) string {
 	text = strings.ReplaceAll(text, "аслинце", "")
 	text = strings.ReplaceAll(text, "Аслинце", "")
 	text = strings.ReplaceAll(text, "\"", "")
-
 	return text
 }
 
