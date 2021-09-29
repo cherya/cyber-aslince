@@ -2,12 +2,13 @@ package aslince
 
 import (
 	"fmt"
-	"github.com/cherya/cyber-aslince/internal/messages_helpers"
-	replyservice "github.com/cherya/cyber-aslince/internal/reply_service"
 	"math/rand"
 	"os"
 	"regexp"
 	"strings"
+
+	"github.com/cherya/cyber-aslince/internal/messages_helpers"
+	replyservice "github.com/cherya/cyber-aslince/internal/reply_service"
 
 	"github.com/cherya/cyber-aslince/internal/daily_plan"
 
@@ -43,7 +44,26 @@ func NewAslince(r *redis.Pool, b tb.Bot, genURL string) *Aslince {
 	go func() {
 		for {
 			repl := <-a.reply.RepliesChan()
-			a.Send(ChatRecipient{id: fmt.Sprintf("%d", repl.ChatID)}, repl.Text, &tb.SendOptions{
+			if repl.Response.Sticker != "" {
+				sticker, err := os.Open(fmt.Sprintf("./resources/stickers/sticker (%s).webp", repl.Response.Sticker))
+				if err != nil {
+					if errors.Cause(err) != os.ErrNotExist {
+						log.Error(err)
+						return
+					}
+					stickerN := rand.Intn(6667)
+					sticker, err = os.Open(fmt.Sprintf("./resources/stickers/sticker (%d).webp", stickerN))
+					if err != nil {
+						log.Error(err)
+						return
+					}
+				}
+				a.Send(ChatRecipient{id: fmt.Sprintf("%d", repl.ChatID)}, &tb.Sticker{
+					File:  tb.FromReader(sticker),
+					Emoji: "🤡",
+				}, &tb.SendOptions{ReplyTo: &tb.Message{ID: repl.ID}})
+			}
+			a.Send(ChatRecipient{id: fmt.Sprintf("%d", repl.ChatID)}, repl.Response.Text, &tb.SendOptions{
 				ReplyTo: &tb.Message{ID: repl.ID},
 			})
 		}
@@ -157,17 +177,11 @@ func (a *Aslince) handleCommand(text string, m *tb.Message) {
 
 func textForGenerator(m *tb.Message) string {
 	var text string
-	texts := make([]string, 0, 2)
 	text = messages_helpers.TextFromMsg(m)
 	text = strings.ReplaceAll(text, "аслинце", "")
-	texts = append(texts, text)
+	text = strings.ReplaceAll(text, "Аслинце", "")
+	text = strings.ReplaceAll(text, "\"", "")
 
-	if m.ReplyTo != nil {
-		text = messages_helpers.TextFromMsg(m)
-		text = strings.ReplaceAll(text, "аслинце", "")
-		texts = append(texts, text)
-		return strings.Join(texts, "\n")
-	}
 	return text
 }
 

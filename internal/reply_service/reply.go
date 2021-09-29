@@ -11,6 +11,11 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type GeneratorResponse struct {
+	Text    string `json:"text"`
+	Sticker string `json:"sticker"`
+}
+
 type Request struct {
 	Text   string
 	ID     int
@@ -18,9 +23,9 @@ type Request struct {
 }
 
 type Reply struct {
-	Text   string
-	ID     int
-	ChatID int64
+	Response GeneratorResponse
+	ID       int
+	ChatID   int64
 }
 
 type Generator struct {
@@ -51,16 +56,16 @@ func New(url string) *Generator {
 				var req Request
 				req, g.requests = g.requests[0], g.requests[1:]
 
-				respText, err := g.doRequest(req.Text)
+				resp, err := g.doRequest(req.Text)
 				if err != nil {
 					log.Error(err)
 					continue
 				}
 
 				g.replies <- Reply{
-					Text:   respText,
-					ID:     req.ID,
-					ChatID: req.ChatID,
+					Response: *resp,
+					ID:       req.ID,
+					ChatID:   req.ChatID,
 				}
 			}
 		}
@@ -69,23 +74,21 @@ func New(url string) *Generator {
 	return g
 }
 
-func (g *Generator) doRequest(text string) (string, error) {
+func (g *Generator) doRequest(text string) (*GeneratorResponse, error) {
 	reqBody := strings.NewReader(fmt.Sprintf(`{"text":"%s"}`, text))
 
 	resp, err := g.client.Post(g.baseURL, "application/json", reqBody)
 	if err != nil {
-		return "", errors.Wrap(err, "request: error doing generator request")
+		return nil, errors.Wrap(err, "request: error doing generator request")
 	}
 	defer resp.Body.Close()
 	decoder := json.NewDecoder(resp.Body)
-	var data struct {
-		Text string `json:"text"`
-	}
+	var data GeneratorResponse
 	err = decoder.Decode(&data)
 	if err != nil {
-		return "", errors.Wrap(err, "request: error decoding generator response")
+		return nil, errors.Wrap(err, "request: error decoding generator response")
 	}
-	return data.Text, nil
+	return &data, nil
 }
 
 func (g *Generator) Generate(text string, replyTo int, chatID int64) {
